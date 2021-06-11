@@ -47,6 +47,13 @@ object Header {
   def userAgent(name: String): Header      = Header(JHttpHeaderNames.USER_AGENT, name)
   def authorization(value: String): Header = Header(JHttpHeaderNames.AUTHORIZATION, value)
 
+  def cookieParser(cookie: List[RequestCookie]): String =
+    cookie.map(a => s"${a.name}=${a.value}").reduce((a, b) => a + ";" + b)
+
+  def cookies(cookie: List[RequestCookie]): Header = Header(JHttpHeaderNames.COOKIE, cookieParser(cookie))
+  def setCookie(cookie: ResponseCookie): Header    =
+    Header(JHttpHeaderNames.SET_COOKIE, cookie.cookieParser)
+
   def basicHttpAuthorization(username: String, password: String): Header = {
     val authString    = String.format("%s:%s", username, password)
     val authCB        = Unpooled.wrappedBuffer(authString.getBytes(CharsetUtil.UTF_8))
