@@ -1,14 +1,20 @@
 package zhttp.http
-import scala.annotation.implicitNotFound
+import zio.=!=
 
-sealed trait ResponseCookie2[+S] { self =>
+import scala.annotation.{implicitAmbiguous, implicitNotFound, unused}
+
+sealed trait ResponseCookie2[+N, +C] { self =>
 
   import zhttp.http.ResponseCookie2._
 
-  def ++[S1 >: S](other: ResponseCookie2[S1]): ResponseCookie2[S1] =
-    Concat(self, other)
+  def ++[N1 >: N, N2, N3, C1 >: C, C2, C3](other: ResponseCookie2[N2, C2])(implicit
+    @unused @implicitNotFound("Name is already set once")
+    n: CanCombine[N1, N2, N3],
+    @unused @implicitNotFound("Content is already set once")
+    c: CanCombine[C1, C2, C3],
+  ): ResponseCookie2[N3, C3] = ???
 
-  def cookieConfig[S1 >: S](s: Cookie)(implicit ev: S1 <:< String): Cookie =
+  def cookieConfig[N1 >: N, C1 >: C](s: Cookie)(implicit ev: N1 <:< String, ev2: C1 <:< String): Cookie =
     self match {
       case Concat(_, _)       => ???
       case Name(name)         => s.copy(name = name)
@@ -21,6 +27,13 @@ sealed trait ResponseCookie2[+S] { self =>
     }
 }
 object ResponseCookie2 {
+  sealed trait CanCombine[X, Y, A]
+
+  object CanCombine {
+    implicit def combineL[A]: CanCombine[A, Nothing, A]                = null
+    implicit def combineR[A]: CanCombine[Nothing, A, A]                = null
+    implicit def combineNothing: CanCombine[Nothing, Nothing, Nothing] = null
+  }
   final case class Cookie(
     name: String,
     content: String,
@@ -31,28 +44,30 @@ object ResponseCookie2 {
     httpOnly: Boolean = false,
   )
 
-  private final case class Concat[S](self: ResponseCookie2[S], other: ResponseCookie2[S]) extends ResponseCookie2[S]
-  private final case class Name[S](name: S)                                               extends ResponseCookie2[S]
-  private final case class Content(content: String)                                       extends ResponseCookie2[Nothing]
-  private final case class Expires(expires: String)                                       extends ResponseCookie2[Nothing]
-  private final case class Domain(domain: String)                                         extends ResponseCookie2[Nothing]
-  private final case class Paths(path: String)                                            extends ResponseCookie2[Nothing]
-  private final case class Secure(secure: Boolean)                                        extends ResponseCookie2[Nothing]
-  private final case class HttpOnly(httpOnly: Boolean)                                    extends ResponseCookie2[Nothing]
+  private final case class Concat[N, C](self: ResponseCookie2[N, C], other: ResponseCookie2[N, C])
+      extends ResponseCookie2[N, C]
+  private final case class Name[N](name: N)            extends ResponseCookie2[N, Nothing]
+  private final case class Content[C](content: String) extends ResponseCookie2[Nothing, C]
+  private final case class Expires(expires: String)    extends ResponseCookie2[Nothing, Nothing]
+  private final case class Domain(domain: String)      extends ResponseCookie2[Nothing, Nothing]
+  private final case class Paths(path: String)         extends ResponseCookie2[Nothing, Nothing]
+  private final case class Secure(secure: Boolean)     extends ResponseCookie2[Nothing, Nothing]
+  private final case class HttpOnly(httpOnly: Boolean) extends ResponseCookie2[Nothing, Nothing]
 
-  def name(name: String): ResponseCookie2[String]           = ResponseCookie2.Name(name)
-  def content(content: String): ResponseCookie2[Nothing]    = ResponseCookie2.Content(content)
-  def expires(expires: String): ResponseCookie2[Nothing]    = ResponseCookie2.Expires(expires)
-  def domain(domain: String): ResponseCookie2[Nothing]      = ResponseCookie2.Domain(domain)
-  def path(path: String): ResponseCookie2[Nothing]          = ResponseCookie2.Paths(path)
-  def secure(secure: Boolean): ResponseCookie2[Nothing]     = ResponseCookie2.Secure(secure)
-  def httpOnly(httpOnly: Boolean): ResponseCookie2[Nothing] = ResponseCookie2.HttpOnly(httpOnly)
+  def name(name: String): ResponseCookie2[String, Nothing]           = ResponseCookie2.Name(name)
+  def content(content: String): ResponseCookie2[Nothing, String]     = ResponseCookie2.Content(content)
+  def expires(expires: String): ResponseCookie2[Nothing, Nothing]    = ResponseCookie2.Expires(expires)
+  def domain(domain: String): ResponseCookie2[Nothing, Nothing]      = ResponseCookie2.Domain(domain)
+  def path(path: String): ResponseCookie2[Nothing, Nothing]          = ResponseCookie2.Paths(path)
+  def secure(secure: Boolean): ResponseCookie2[Nothing, Nothing]     = ResponseCookie2.Secure(secure)
+  def httpOnly(httpOnly: Boolean): ResponseCookie2[Nothing, Nothing] = ResponseCookie2.HttpOnly(httpOnly)
 
-  @implicitNotFound("Cookie doesn't have name set")
-  sealed trait HasName[S]
-  implicit object HasName extends HasName[String]
-
-  def asCookie[S](self: ResponseCookie2[S])(implicit ev: HasName[S]): ResponseCookie2[S] = ???
+  def asCookie[N, C](
+    self: ResponseCookie2[N, C],
+  )(implicit
+    @implicitAmbiguous("Name is not set") evN: N =!= Nothing,
+    @implicitAmbiguous("Content is not set") evC: C =!= Nothing,
+  ): ResponseCookie2[N, C] = self
 
 }
 object HelloWorld extends App {
@@ -63,8 +78,8 @@ object HelloWorld extends App {
 //    ResponseCookie2.name("s")
 
   val b = ResponseCookie2.Cookie("s", "s")
-  val c = ResponseCookie2.asCookie(ResponseCookie2.content("s"))
-  println(c)
+  val c = ResponseCookie2.name("s")
+//  val e = ResponseCookie2.asCookie(ResponseCookie2.name("s") ++ ResponseCookie2.domain("s"))
 }
 
 // apply method
